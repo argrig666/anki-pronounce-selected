@@ -1,19 +1,8 @@
 {
   "shortcut": "Alt+C",
-  "default_voice": "it-IT-ElsaNeural",
   "volume": 140,
   "audio_output": "pipewire,pulse",
   "speed": 1.0,
-  "pronounce_card_if_no_selection": true,
-  "auto_detect_english_field": true,
-  "show_tooltip": true,
-  "deck_voices": {
-    "Italian Decks": "it-IT-ElsaNeural",
-    "Italian provinces": "it-IT-ElsaNeural",
-    "French Decks": "fr-FR-DeniseNeural",
-    "English Dict": "en-US-JennyNeural",
-    "Русский": "ru-RU-SvetlanaNeural",
-    "Russian": "ru-RU-SvetlanaNeural"
-  },
+  "show_tooltip": false,
   "debug_log": false
 }

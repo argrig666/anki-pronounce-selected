@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+user_files/cache/
+user_files/debug.log
+dist/
