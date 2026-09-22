@@ -157,13 +157,11 @@ def _shortcut_to_js_condition(shortcut: str) -> str:
 
     key_tests = [
         f'e.code === "Key{k.upper()}"',
-        f'e.key === "{k.lower()}"',
-        f'e.key === "{k.upper()}"',
+        f'(e.key && e.key.toLowerCase() === "{k.lower()}")',
     ]
     if k.lower() in _CYRILLIC_KEY_MAP:
         cyr = _CYRILLIC_KEY_MAP[k.lower()]
-        key_tests.append(f'e.key === "{cyr}"')
-        key_tests.append(f'e.key === "{cyr.upper()}"')
+        key_tests.append(f'(e.key && e.key.toLowerCase() === "{cyr.lower()}")')
 
     mods.append(f'({" || ".join(key_tests)})')
     return " && ".join(mods)
@@ -593,6 +591,8 @@ def _build_js_listener(shortcut: str) -> str:
 
 def _ensure_reviewer_js_listener(card: Any = None) -> None:
     """Ensure the DOM keydown listener is refreshed on every card question/answer."""
+    if not _GLOBAL_SHORTCUTS and aqt.mw:
+        _init_global_shortcuts()
     if aqt.mw and hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "web") and aqt.mw.reviewer.web:
         cfg = _load_config()
         shortcut = cfg.get("shortcut", "Alt+C")
@@ -600,12 +600,15 @@ def _ensure_reviewer_js_listener(card: Any = None) -> None:
         js_code = script.replace("<script>", "").replace("</script>", "").strip()
         try:
             aqt.mw.reviewer.web.eval(js_code)
-        except Exception:
-            pass
+            _log(f"Refreshed reviewer DOM keydown listener for '{shortcut}'")
+        except Exception as err:
+            _log(f"Failed to refresh reviewer DOM listener: {err}")
 
 
 def _on_webview_will_set_content(web_content: aqt.webview.WebContent, context: Any) -> None:
     """Inject DOM keydown listener into every Anki web view."""
+    if not _GLOBAL_SHORTCUTS and aqt.mw:
+        _init_global_shortcuts()
     cfg = _load_config()
     shortcut = cfg.get("shortcut", "Alt+C")
     script = _build_js_listener(shortcut)
@@ -641,8 +644,8 @@ def _on_webview_did_receive_js_message(
 # --- Hook Registrations ---
 
 def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]) -> None:
-    """Register reviewer shortcut."""
-    if state == "review":
+    """Register reviewer shortcut only if ApplicationShortcut is not active, to prevent Qt ambiguity."""
+    if state == "review" and not _GLOBAL_SHORTCUTS:
         cfg = _load_config()
         shortcut_key = cfg.get("shortcut", "Alt+C")
         shortcuts.append((shortcut_key, trigger_pronounce))
@@ -652,7 +655,7 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
             cyr_key = _CYRILLIC_KEY_MAP[base_k].upper()
             cyr_shortcut = "+".join(parts[:-1] + [cyr_key])
             shortcuts.append((cyr_shortcut, trigger_pronounce))
-        _log(f"Registered review state shortcuts for '{shortcut_key}'")
+        _log(f"Registered review state fallback shortcuts for '{shortcut_key}'")
 
 
 def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
@@ -710,6 +713,7 @@ def _init_global_shortcuts() -> None:
         try:
             scut = QShortcut(QKeySequence(k_seq), aqt.mw, activated=trigger_pronounce)
             scut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            scut.setAutoRepeat(False)
             _GLOBAL_SHORTCUTS.append(scut)
             _log(f"Installed ApplicationShortcut '{k_seq}' on mw")
         except Exception as err:
@@ -730,6 +734,7 @@ gui_hooks.editor_did_init_shortcuts.append(_on_editor_did_init_shortcuts)
 gui_hooks.reviewer_will_show_context_menu.append(_on_reviewer_context_menu)
 gui_hooks.reviewer_did_show_question.append(_ensure_reviewer_js_listener)
 gui_hooks.reviewer_did_show_answer.append(_ensure_reviewer_js_listener)
+gui_hooks.main_window_did_init.append(_init_global_shortcuts)
 gui_hooks.profile_did_open.append(_init_global_shortcuts)
 
 if aqt.mw and hasattr(aqt.mw, "addonManager"):
@@ -738,5 +743,5 @@ if aqt.mw and hasattr(aqt.mw, "addonManager"):
     except Exception:
         pass
 
-if aqt.mw and aqt.mw.col:
+if aqt.mw:
     _init_global_shortcuts()

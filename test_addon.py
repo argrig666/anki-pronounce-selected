@@ -181,6 +181,20 @@ class TestPronounceSelected(unittest.TestCase):
         ps._on_webview_will_set_content(mock_content, None)
         self.assertIn("pronounce_fallback:", mock_content.head)
 
+    def test_state_shortcuts_no_duplicate_when_global_active(self):
+        """Verify state shortcuts avoid duplicate registration when ApplicationShortcut is active."""
+        shortcuts = []
+        with patch.object(ps, "_GLOBAL_SHORTCUTS", [MagicMock()]):
+            ps._on_state_shortcuts_will_change("review", shortcuts)
+            self.assertEqual(len(shortcuts), 0)
+
+    def test_state_shortcuts_fallback_when_global_empty(self):
+        """Verify state shortcuts register fallback when ApplicationShortcut list is empty."""
+        shortcuts = []
+        with patch.object(ps, "_GLOBAL_SHORTCUTS", []):
+            ps._on_state_shortcuts_will_change("review", shortcuts)
+            self.assertGreater(len(shortcuts), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
