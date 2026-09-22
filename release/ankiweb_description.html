@@ -1,0 +1,51 @@
+<h2>Pronounce Selected Text (Shift+Alt+C)</h2>
+
+<p><b>Instant, ultra-realistic text-to-speech pronunciation of any highlighted text in Anki upon pressing Shift+Alt+C (or custom shortcut). Powered by Microsoft Azure / Edge Neural voices with automatic language detection.</b></p>
+
+<h3>Features</h3>
+<ul>
+  <li><b>Pure &amp; Silent Non-Selection</b>: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser. If nothing is selected, <b>NOTHING happens</b> (no sound, no popup spam, no interruption of your review flow).</li>
+  <li><b>Automatic Language Detection</b>: Automatically identifies the language of the selected text on-the-fly and selects the corresponding dedicated native voice (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, and more).</li>
+  <li><b>Dedicated Native Monolingual Voices</b>: Enforces neural TTS principles by defaulting to native monolingual voices (<code>it-IT-ElsaNeural</code>, <code>fr-FR-DeniseNeural</code>, <code>es-ES-ElviraNeural</code>, <code>de-DE-KatjaNeural</code>, <code>ru-RU-SvetlanaNeural</code>, <code>en-US-JennyNeural</code>) to prevent English phonetic leakage on shared vocabulary.</li>
+  <li><b>Dynamic SSML Locale Integrity</b>: Synthesizes audio with exact <code>xml:lang</code> root document matching to ensure pristine native intonation.</li>
+  <li><b>Zero Configuration &amp; Zero API Keys</b>: Works out-of-the-box with no Microsoft account or API key required.</li>
+  <li><b>Dual DOM &amp; Qt Event Interception</b>: Directly captures key events inside the webview DOM for 100% instant, reliable response on Linux.</li>
+  <li><b>Instant Local Caching (&lt;1 ms)</b>: Synthesizes new words in ~400 ms and caches them locally to disk. Repeat reviews play instantly (&lt;1 ms).</li>
+  <li><b>Audio Preemption</b>: Rapidly highlighting words cleanly stops any previous playback so the new audio plays immediately.</li>
+  <li><b>100% Standalone</b>: Fully self-contained with bundled dependencies. Does not require any other add-on.</li>
+</ul>
+
+<h3>Supported Languages &amp; Dedicated Voices</h3>
+<ul>
+  <li><b>Italian</b>: <code>it-IT-ElsaNeural</code></li>
+  <li><b>French</b>: <code>fr-FR-DeniseNeural</code></li>
+  <li><b>Spanish</b>: <code>es-ES-ElviraNeural</code></li>
+  <li><b>German</b>: <code>de-DE-KatjaNeural</code></li>
+  <li><b>Russian</b>: <code>ru-RU-SvetlanaNeural</code></li>
+  <li><b>English</b>: <code>en-US-JennyNeural</code></li>
+  <li><b>Portuguese</b>: <code>pt-BR-FranciscaNeural</code></li>
+  <li><b>Japanese</b>: <code>ja-JP-NanamiNeural</code></li>
+  <li><b>Chinese</b>: <code>zh-CN-XiaoxiaoNeural</code></li>
+  <li><i>(Plus Ukrainian, Greek, Arabic, Hebrew, and standard languages)</i></li>
+</ul>
+
+<h3>Prerequisites</h3>
+<p>Ensure <code>mpv</code> is installed on your Linux system:</p>
+<ul>
+  <li><b>Arch Linux / Omarchy</b>: <code>sudo pacman -S mpv</code></li>
+  <li><b>Ubuntu / Debian</b>: <code>sudo apt install mpv</code></li>
+  <li><b>Fedora</b>: <code>sudo dnf install mpv</code></li>
+</ul>
+
+<h3>Configuration</h3>
+<p>In Anki, navigate to <b>Tools</b> &rarr; <b>Add-ons</b> &rarr; select <b>Pronounce Selected Text</b> &rarr; click <b>Config</b>.</p>
+<pre><code>{
+  "shortcut": "Shift+Alt+C",
+  "volume": 140,
+  "audio_output": "pipewire,pulse",
+  "speed": 1.0,
+  "show_tooltip": false,
+  "debug_log": true
+}</code></pre>
+
+<p>GitHub Repository: <a href="https://github.com/argrig666/anki-pronounce-selected">https://github.com/argrig666/anki-pronounce-selected</a></p>

@@ -1,8 +1,8 @@
 {
-  "shortcut": "Alt+C",
+  "shortcut": "Shift+Alt+C",
   "volume": 140,
   "audio_output": "pipewire,pulse",
   "speed": 1.0,
   "show_tooltip": false,
-  "debug_log": false
+  "debug_log": true
 }

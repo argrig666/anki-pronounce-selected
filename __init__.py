@@ -1,5 +1,5 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""Pronounce Selected Text (Alt+C) for Anki.
+"""Pronounce Selected Text for Anki.
 
 Instantly pronounces highlighted / selected text across Anki (Card Reviewer,
 Note Editor, and Card Browser) using high-quality Microsoft Azure / Edge Neural voices.
@@ -10,8 +10,8 @@ Note Editor, and Card Browser) using high-quality Microsoft Azure / Edge Neural 
 - Dynamic SSML xml:lang locale integrity.
 - Instant (<1 ms) cached playback via mpv.
 - Non-blocking background synthesis for new words.
-- Audio preemption (cleanly terminates previous audio when Alt+C is hit rapidly).
-- Dual DOM & Qt shortcut capture for 100% reliable Alt+C interception.
+- Audio preemption (cleanly terminates previous audio when shortcut is pressed rapidly).
+- Dual DOM & Qt shortcut capture for 100% reliable interception.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ def _load_config() -> dict[str, Any]:
         except Exception:
             pass
     return {
-        "shortcut": "Alt+C",
+        "shortcut": "Shift+Alt+C",
         "volume": 140,
         "audio_output": "pipewire,pulse",
         "speed": 1.0,
@@ -109,6 +109,36 @@ def _clean_text(raw: str) -> str:
     if m_ipa:
         text = m_ipa.group(1)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _shortcut_to_js_condition(shortcut: str) -> str:
+    """Translate Qt shortcut string (e.g. 'Shift+Alt+C') into a JavaScript keydown event condition."""
+    parts = [p.strip().lower() for p in shortcut.split("+")]
+    mods = []
+    if "ctrl" in parts or "control" in parts:
+        mods.append("e.ctrlKey")
+    else:
+        mods.append("!e.ctrlKey")
+
+    if "alt" in parts:
+        mods.append("e.altKey")
+    else:
+        mods.append("!e.altKey")
+
+    if "shift" in parts:
+        mods.append("e.shiftKey")
+    else:
+        mods.append("!e.shiftKey")
+
+    if "meta" in parts or "super" in parts or "cmd" in parts:
+        mods.append("e.metaKey")
+    else:
+        mods.append("!e.metaKey")
+
+    key_parts = [p for p in parts if p not in ("ctrl", "control", "alt", "shift", "meta", "super", "cmd")]
+    k = key_parts[0] if key_parts else "c"
+    mods.append(f'(e.key === "{k.lower()}" || e.key === "{k.upper()}" || e.code === "Key{k.upper()}")')
+    return " && ".join(mods)
 
 
 def _get_cache_path(voice_name: str, speed: float, text: str) -> str:
@@ -242,7 +272,7 @@ def _get_editor_context_lang(editor: Any) -> str | None:
 
 
 def _get_active_webview() -> Any | None:
-    """Get active WebEngineView in the current Anki window."""
+    """Get active WebEngineView in current Anki window."""
     if not aqt.mw:
         return None
     if aqt.mw.state == "review" and hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "web"):
@@ -328,7 +358,7 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
 
 
 def trigger_pronounce() -> None:
-    """Qt shortcut handler (Alt+C). Queries active webview and clipboard."""
+    """Qt shortcut handler. Queries active webview and clipboard."""
     _log("trigger_pronounce activated via Qt shortcut")
     cb_text = ""
     cb = QApplication.clipboard()
@@ -374,7 +404,7 @@ def trigger_pronounce() -> None:
 
 
 def on_editor_pronounce(editor: Any) -> None:
-    """Editor shortcut handler (Alt+C)."""
+    """Editor shortcut handler."""
     _log("on_editor_pronounce activated via Editor shortcut")
     web = getattr(editor, "web", None)
     if web and hasattr(web, "page") and web.page():
@@ -399,42 +429,47 @@ def on_editor_pronounce(editor: Any) -> None:
 
 # --- DOM Keydown Injection & JS Bridge (100% Reliable In-Card Capture) ---
 
-_JS_LISTENER = """
+def _build_js_listener(shortcut: str) -> str:
+    condition = _shortcut_to_js_condition(shortcut)
+    return f"""
 <script>
-(function() {
+(function() {{
     if (window._pronounceSelectedInjected) return;
     window._pronounceSelectedInjected = true;
-    document.addEventListener("keydown", function(e) {
-        if (e.altKey && (e.key === "c" || e.key === "C" || e.code === "KeyC")) {
+    document.addEventListener("keydown", function(e) {{
+        if ({condition}) {{
             var sel = "";
-            if (window.getSelection) {
+            if (window.getSelection) {{
                 sel = window.getSelection().toString();
-            }
-            if (!sel && document.activeElement) {
+            }}
+            if (!sel && document.activeElement) {{
                 var el = document.activeElement;
-                if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+                if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {{
                     var start = el.selectionStart, end = el.selectionEnd;
-                    if (typeof start === "number" && typeof end === "number" && start !== end) {
+                    if (typeof start === "number" && typeof end === "number" && start !== end) {{
                         sel = el.value.substring(start, end);
-                    }
-                }
-            }
-            if (sel && sel.trim()) {
+                    }}
+                }}
+            }}
+            if (sel && sel.trim()) {{
                 pycmd("pronounce_selected:" + encodeURIComponent(sel.trim()));
                 e.preventDefault();
                 e.stopPropagation();
-            }
-        }
-    }, true);
-})();
+            }}
+        }}
+    }}, true);
+}})();
 </script>
 """
 
 
 def _on_webview_will_set_content(web_content: aqt.webview.WebContent, context: Any) -> None:
-    """Inject DOM keydown listener into every Anki web view (Reviewer, Editor, etc.)."""
-    web_content.head += _JS_LISTENER
-    _log(f"Injected JS keydown listener into webview content (context={type(context).__name__})")
+    """Inject DOM keydown listener into every Anki web view."""
+    cfg = _load_config()
+    shortcut = cfg.get("shortcut", "Shift+Alt+C")
+    script = _build_js_listener(shortcut)
+    web_content.head += script
+    _log(f"Injected JS keydown listener for '{shortcut}' (context={type(context).__name__})")
 
 
 def _on_webview_did_receive_js_message(
@@ -458,7 +493,7 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
     """Register reviewer shortcut."""
     if state == "review":
         cfg = _load_config()
-        shortcut_key = cfg.get("shortcut", "Alt+C")
+        shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
         shortcuts.append((shortcut_key, trigger_pronounce))
         _log(f"Registered review state shortcut '{shortcut_key}'")
 
@@ -466,14 +501,16 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
 def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
     """Register editor shortcut."""
     cfg = _load_config()
-    shortcut_key = cfg.get("shortcut", "Alt+C")
+    shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
     shortcuts.append((shortcut_key, lambda ed=editor: on_editor_pronounce(ed), True))
     _log(f"Registered editor shortcut '{shortcut_key}'")
 
 
 def _on_reviewer_context_menu(reviewer: Any, menu: QMenu) -> None:
-    """Add 'Pronounce Selected Text (Alt+C)' to reviewer right-click context menu."""
-    action = QAction("Pronounce Selected Text (Alt+C)", menu)
+    """Add 'Pronounce Selected Text' to reviewer right-click context menu."""
+    cfg = _load_config()
+    shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
+    action = QAction(f"Pronounce Selected Text ({shortcut_key})", menu)
     action.triggered.connect(trigger_pronounce)
     menu.addAction(action)
 
@@ -482,7 +519,7 @@ def _init_global_shortcuts() -> None:
     """Ensure a fallback application-level shortcut is active on main window."""
     if aqt.mw:
         cfg = _load_config()
-        shortcut_key = cfg.get("shortcut", "Alt+C")
+        shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
         scut = QShortcut(QKeySequence(shortcut_key), aqt.mw, activated=trigger_pronounce)
         scut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         _log(f"Installed ApplicationShortcut '{shortcut_key}' on mw")
