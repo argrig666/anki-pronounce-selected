@@ -3,3 +3,4 @@ __pycache__/
 user_files/cache/
 user_files/debug.log
 dist/
+meta.json

@@ -52,6 +52,11 @@ class TestPronounceSelected(unittest.TestCase):
         self.assertIn("pronounce_selected:", mock_content.head)
         self.assertIn("KeyC", mock_content.head)
 
+    def test_cyrillic_shortcut_condition(self):
+        cond = ps._shortcut_to_js_condition("Shift+Alt+C")
+        self.assertIn("\u0441", cond)  # Cyrillic 'с'
+        self.assertIn("KeyC", cond)
+
     def test_auto_detect_language(self):
         """Requirement 3: Automatic language detection."""
         cases = [
