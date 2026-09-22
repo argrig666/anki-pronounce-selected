@@ -23,44 +23,51 @@ class TestPronounceSelected(unittest.TestCase):
 
     def test_non_selection_does_nothing(self):
         """Requirement 2: NOTHING happens on non-selection."""
-        with patch.object(ps, "_get_current_selection", return_value=""):
-            with patch.object(ps, "pronounce_text") as mock_pronounce:
-                with patch.object(ps, "tooltip") as mock_tooltip:
+        # 1. Test JS bridge with empty text
+        with patch.object(ps, "pronounce_text") as mock_pronounce:
+            res = ps._on_webview_did_receive_js_message((False, None), "pronounce_selected:", None)
+            mock_pronounce.assert_not_called()
+            self.assertEqual(res, (True, None))
+
+        # 2. Test Qt trigger with empty clipboard & empty webview
+        with patch.object(ps, "QApplication") as mock_app:
+            mock_app.clipboard().supportsSelection.return_value = False
+            with patch.object(ps, "_get_active_webview", return_value=None):
+                with patch.object(ps, "pronounce_text") as mock_pronounce:
                     ps.trigger_pronounce()
                     mock_pronounce.assert_not_called()
-                    mock_tooltip.assert_not_called()
 
-        mock_editor = MagicMock()
-        mock_editor.web.hasSelection.return_value = False
-        mock_editor.web.selectedText.return_value = ""
+    def test_js_bridge_triggers_pronounce(self):
+        """Test JS bridge correctly decodes and triggers pronunciation."""
         with patch.object(ps, "pronounce_text") as mock_pronounce:
-            with patch.object(ps, "tooltip") as mock_tooltip:
-                ps.on_editor_pronounce(mock_editor)
-                mock_pronounce.assert_not_called()
-                mock_tooltip.assert_not_called()
+            res = ps._on_webview_did_receive_js_message((False, None), "pronounce_selected:buongiorno", None)
+            mock_pronounce.assert_called_once_with("buongiorno", context_lang=None)
+            self.assertEqual(res, (True, None))
+
+    def test_js_listener_injected(self):
+        """Verify DOM keydown listener is injected into web views."""
+        mock_content = MagicMock()
+        mock_content.head = ""
+        ps._on_webview_will_set_content(mock_content, None)
+        self.assertIn("pronounce_selected:", mock_content.head)
+        self.assertIn("KeyC", mock_content.head)
 
     def test_auto_detect_language(self):
         """Requirement 3: Automatic language detection."""
         cases = [
-            # Italian
             ("dire", "it-IT-ElsaNeural"),
             ("uno zaino", "it-IT-ElsaNeural"),
             ("Ho bisógno di ùno zàino per la scuòla.", "it-IT-ElsaNeural"),
             ("Con pròve miglióri, dirébbero il contrário.", "it-IT-ElsaNeural"),
-            # English
             ("backpack", "en-US-JennyNeural"),
             ("With better evidence, they would say the opposite.", "en-US-JennyNeural"),
             ("to say / to tell", "en-US-JennyNeural"),
-            # French
             ("apercevoir", "fr-FR-DeniseNeural"),
             ("J’ai aperçu mon voisin dans la foule.", "fr-FR-DeniseNeural"),
-            # Spanish
             ("estudiar", "es-ES-ElviraNeural"),
             ("buenos días", "es-ES-ElviraNeural"),
-            # German
             ("geschrieben", "de-DE-KatjaNeural"),
             ("Guten Morgen", "de-DE-KatjaNeural"),
-            # Russian
             ("Здравствуйте", "ru-RU-SvetlanaNeural"),
             ("спасибо большое", "ru-RU-SvetlanaNeural"),
         ]

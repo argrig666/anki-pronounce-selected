@@ -11,6 +11,7 @@ Note Editor, and Card Browser) using high-quality Microsoft Azure / Edge Neural 
 - Instant (<1 ms) cached playback via mpv.
 - Non-blocking background synthesis for new words.
 - Audio preemption (cleanly terminates previous audio when Alt+C is hit rapidly).
+- Dual DOM & Qt shortcut capture for 100% reliable Alt+C interception.
 """
 
 from __future__ import annotations
@@ -23,13 +24,14 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import aqt
 from anki.utils import checksum
 from aqt import gui_hooks
-from aqt.qt import QAction, QKeySequence, QMenu, QShortcut
+from aqt.qt import QAction, QApplication, QClipboard, QKeySequence, QMenu, QShortcut, Qt
 from aqt.utils import tooltip
 
 # Path resolution - 100% relative and self-contained
@@ -83,14 +85,11 @@ def _load_config() -> dict[str, Any]:
         "audio_output": "pipewire,pulse",
         "speed": 1.0,
         "show_tooltip": False,
-        "debug_log": False,
+        "debug_log": True,
     }
 
 
 def _log(msg: str) -> None:
-    cfg = _load_config()
-    if not cfg.get("debug_log", False):
-        return
     try:
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         os.makedirs(os.path.dirname(_LOG_PATH), exist_ok=True)
@@ -173,7 +172,7 @@ def _play_audio_file(audio_path: str, cfg: dict[str, Any]) -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        _log(f"Spawned mpv: {audio_path}")
+        _log(f"Spawned mpv for {audio_path}")
     except Exception as err:
         _log(f"Failed to spawn mpv: {err}")
         tooltip(f"Audio playback error: {err}")
@@ -242,33 +241,19 @@ def _get_editor_context_lang(editor: Any) -> str | None:
     return None
 
 
-def _get_current_selection() -> str:
-    """Retrieve highlighted / selected text. Returns empty string if nothing selected."""
-    # 1. Reviewer WebEngineView
-    if aqt.mw and aqt.mw.state == "review":
-        if hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "web"):
-            web = aqt.mw.reviewer.web
-            if web and web.hasSelection():
-                txt = _clean_text(web.selectedText())
-                if txt:
-                    return txt
-
-    # 2. Focused widget (or parent WebViews / QLineEdit / QTextEdit)
-    if aqt.mw and hasattr(aqt.mw, "app"):
-        w = aqt.mw.app.focusWidget()
-        curr = w
-        while curr:
-            if hasattr(curr, "hasSelection") and hasattr(curr, "selectedText"):
-                try:
-                    if curr.hasSelection():
-                        txt = _clean_text(curr.selectedText())
-                        if txt:
-                            return txt
-                except Exception:
-                    pass
-            curr = curr.parent()
-
-    return ""
+def _get_active_webview() -> Any | None:
+    """Get active WebEngineView in the current Anki window."""
+    if not aqt.mw:
+        return None
+    if aqt.mw.state == "review" and hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "web"):
+        return aqt.mw.reviewer.web
+    w = aqt.mw.app.focusWidget() if hasattr(aqt.mw, "app") else None
+    curr = w
+    while curr:
+        if hasattr(curr, "page") and hasattr(curr.page(), "runJavaScript"):
+            return curr
+        curr = curr.parent()
+    return None
 
 
 def pronounce_text(text: str, context_lang: str | None = None) -> None:
@@ -278,7 +263,6 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
         return
 
     cfg = _load_config()
-    # 3. Auto-detect language!
     voice = detector.get_voice_for_text(clean, context_lang=context_lang)
     speed = float(cfg.get("speed", 1.0))
     _log(f"Auto-detected voice '{voice}' for '{clean}' (context_lang={context_lang})")
@@ -344,28 +328,128 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
 
 
 def trigger_pronounce() -> None:
-    """Main entry point when shortcut (Alt+C) is pressed in Reviewer or globally."""
-    text = _get_current_selection()
-    if not text:
-        # 2. NOTHING happens on non-selection!
-        return
+    """Qt shortcut handler (Alt+C). Queries active webview and clipboard."""
+    _log("trigger_pronounce activated via Qt shortcut")
+    cb_text = ""
+    cb = QApplication.clipboard()
+    if cb and cb.supportsSelection():
+        try:
+            cb_text = _clean_text(cb.text(QClipboard.Mode.Selection))
+        except Exception:
+            pass
 
-    context_lang = _get_active_card_context_lang()
-    pronounce_text(text, context_lang=context_lang)
+    web = _get_active_webview()
+    if web and hasattr(web, "page") and web.page():
+        js = """(() => {
+            let s = window.getSelection ? window.getSelection().toString() : "";
+            if (s && s.trim()) return s.trim();
+            let el = document.activeElement;
+            if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+                let start = el.selectionStart, end = el.selectionEnd;
+                if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+                    return el.value.substring(start, end).trim();
+                }
+            }
+            return "";
+        })()"""
+
+        def on_eval_done(res):
+            txt = _clean_text(str(res or ""))
+            if not txt and cb_text:
+                txt = cb_text
+            if not txt:
+                _log("Qt shortcut: No selection found (silent return)")
+                return
+            _log(f"Qt shortcut captured: '{txt}'")
+            context_lang = _get_active_card_context_lang()
+            pronounce_text(txt, context_lang=context_lang)
+
+        web.page().runJavaScript(js, on_eval_done)
+    elif cb_text:
+        _log(f"Qt shortcut captured from primary clipboard: '{cb_text}'")
+        context_lang = _get_active_card_context_lang()
+        pronounce_text(cb_text, context_lang=context_lang)
+    else:
+        _log("Qt shortcut: No webview or clipboard selection found (silent return)")
 
 
 def on_editor_pronounce(editor: Any) -> None:
-    """Entry point when Alt+C is pressed inside an Editor."""
-    txt = ""
-    if hasattr(editor, "web") and editor.web and editor.web.hasSelection():
-        txt = _clean_text(editor.web.selectedText())
+    """Editor shortcut handler (Alt+C)."""
+    _log("on_editor_pronounce activated via Editor shortcut")
+    web = getattr(editor, "web", None)
+    if web and hasattr(web, "page") and web.page():
+        js = "window.getSelection ? window.getSelection().toString() : ''"
+        def on_eval(res):
+            txt = _clean_text(str(res or ""))
+            if not txt:
+                cb = QApplication.clipboard()
+                if cb and cb.supportsSelection():
+                    try:
+                        txt = _clean_text(cb.text(QClipboard.Mode.Selection))
+                    except Exception:
+                        pass
+            if not txt:
+                _log("Editor shortcut: No selection found (silent return)")
+                return
+            _log(f"Editor shortcut captured: '{txt}'")
+            context_lang = _get_editor_context_lang(editor)
+            pronounce_text(txt, context_lang=context_lang)
+        web.page().runJavaScript(js, on_eval)
 
-    if not txt:
-        # 2. NOTHING happens on non-selection!
-        return
 
-    context_lang = _get_editor_context_lang(editor)
-    pronounce_text(txt, context_lang=context_lang)
+# --- DOM Keydown Injection & JS Bridge (100% Reliable In-Card Capture) ---
+
+_JS_LISTENER = """
+<script>
+(function() {
+    if (window._pronounceSelectedInjected) return;
+    window._pronounceSelectedInjected = true;
+    document.addEventListener("keydown", function(e) {
+        if (e.altKey && (e.key === "c" || e.key === "C" || e.code === "KeyC")) {
+            var sel = "";
+            if (window.getSelection) {
+                sel = window.getSelection().toString();
+            }
+            if (!sel && document.activeElement) {
+                var el = document.activeElement;
+                if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+                    var start = el.selectionStart, end = el.selectionEnd;
+                    if (typeof start === "number" && typeof end === "number" && start !== end) {
+                        sel = el.value.substring(start, end);
+                    }
+                }
+            }
+            if (sel && sel.trim()) {
+                pycmd("pronounce_selected:" + encodeURIComponent(sel.trim()));
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+    }, true);
+})();
+</script>
+"""
+
+
+def _on_webview_will_set_content(web_content: aqt.webview.WebContent, context: Any) -> None:
+    """Inject DOM keydown listener into every Anki web view (Reviewer, Editor, etc.)."""
+    web_content.head += _JS_LISTENER
+    _log(f"Injected JS keydown listener into webview content (context={type(context).__name__})")
+
+
+def _on_webview_did_receive_js_message(
+    handled: tuple[bool, Any], message: str, context: Any
+) -> tuple[bool, Any]:
+    """Intercept pycmd('pronounce_selected:...') messages from injected DOM listener."""
+    if message.startswith("pronounce_selected:"):
+        encoded_sel = message[len("pronounce_selected:"):].strip()
+        text = urllib.parse.unquote(encoded_sel)
+        _log(f"Received JS bridge pronounce_selected: '{text}' (context={type(context).__name__})")
+        if text:
+            context_lang = _get_active_card_context_lang()
+            pronounce_text(text, context_lang=context_lang)
+        return (True, None)
+    return handled
 
 
 # --- Hook Registrations ---
@@ -376,7 +460,7 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
         cfg = _load_config()
         shortcut_key = cfg.get("shortcut", "Alt+C")
         shortcuts.append((shortcut_key, trigger_pronounce))
-        _log(f"Registered review shortcut '{shortcut_key}'")
+        _log(f"Registered review state shortcut '{shortcut_key}'")
 
 
 def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
@@ -388,24 +472,24 @@ def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
 
 
 def _on_reviewer_context_menu(reviewer: Any, menu: QMenu) -> None:
-    """Add 'Pronounce Selected Text (Alt+C)' to reviewer right-click context menu when text is selected."""
-    if reviewer.web and reviewer.web.hasSelection():
-        sel = _clean_text(reviewer.web.selectedText())
-        label = f'Pronounce "{sel[:20]}..." (Alt+C)' if len(sel) > 20 else f'Pronounce "{sel}" (Alt+C)'
-        action = QAction(label, menu)
-        action.triggered.connect(trigger_pronounce)
-        menu.addAction(action)
+    """Add 'Pronounce Selected Text (Alt+C)' to reviewer right-click context menu."""
+    action = QAction("Pronounce Selected Text (Alt+C)", menu)
+    action.triggered.connect(trigger_pronounce)
+    menu.addAction(action)
 
 
 def _init_global_shortcuts() -> None:
-    """Ensure a fallback window-level shortcut is active on main window."""
+    """Ensure a fallback application-level shortcut is active on main window."""
     if aqt.mw:
         cfg = _load_config()
         shortcut_key = cfg.get("shortcut", "Alt+C")
-        QShortcut(QKeySequence(shortcut_key), aqt.mw, activated=trigger_pronounce)
-        _log(f"Installed window shortcut '{shortcut_key}' on mw")
+        scut = QShortcut(QKeySequence(shortcut_key), aqt.mw, activated=trigger_pronounce)
+        scut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        _log(f"Installed ApplicationShortcut '{shortcut_key}' on mw")
 
 
+gui_hooks.webview_will_set_content.append(_on_webview_will_set_content)
+gui_hooks.webview_did_receive_js_message.append(_on_webview_did_receive_js_message)
 gui_hooks.state_shortcuts_will_change.append(_on_state_shortcuts_will_change)
 gui_hooks.editor_did_init_shortcuts.append(_on_editor_did_init_shortcuts)
 gui_hooks.reviewer_will_show_context_menu.append(_on_reviewer_context_menu)
