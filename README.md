@@ -18,6 +18,8 @@ Instant, ultra-realistic text-to-speech pronunciation of highlighted text in Ank
 - **Dual DOM & Qt Capture**: Directly intercepts keypresses in the card webview DOM for 100% instant, reliable response on Linux.
 - **Instant Disk Caching (<1 ms)**: Caches synthesized audio locally. Repeat reviews play instantly without network access.
 - **Audio Preemption**: Rapidly highlighting words cleanly stops previous playback so the new pronunciation plays immediately.
+- **Zero-Restart Live Config**: Any changes made in **Tools** → **Add-ons** → **Config** take effect immediately on-the-fly without needing to restart Anki.
+- **Multi-Layout Keyboard Support**: Fully layout-resilient (physical key code + Cyrillic mapping). Works seamlessly whether your active keyboard layout is English or Russian.
 - **100% Standalone**: Self-contained with all Python dependencies bundled. Zero setup or API keys needed.
 - **Right-Click Menu**: Also adds a *"Pronounce Selected Text"* action to the reviewer right-click context menu.
 
