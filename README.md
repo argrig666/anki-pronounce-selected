@@ -4,36 +4,37 @@
 [![Anki](https://img.shields.io/badge/Anki-23.10%2B%20%7C%2024%2B%20%7C%2025%2B%20%7C%2026%2B-brightgreen)](https://apps.ankiweb.net/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%2F%20Omarchy-orange)](#system-requirements)
 
-Instant, ultra-realistic text-to-speech pronunciation of highlighted text in Anki upon pressing **Shift+Alt+C** (or configurable shortcut). Powered by Microsoft Azure / Edge Neural voices with dynamic automatic language detection.
+Instant, ultra-realistic text-to-speech pronunciation in Anki upon pressing **Alt+C** (configurable). Powered by Microsoft Azure / Edge Neural voices with automatic on-the-fly language detection.
 
 ---
 
-## Features
+## Key Highlights
 
-- **Selection Pronunciation**: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser and pronounces it instantly.
-- **Smart Fallback on Non-Selection**: If no text is selected when pressing the shortcut, the add-on automatically pronounces a configurable card field (default: `"ItalianExample"`). On verb conjugation cards, it intelligently speaks the template-specific example (e.g. `"Loro example"`). Set to `""` in config if you prefer completely silent behavior when nothing is selected.
-- **On-The-Fly Language Auto-Detection**: Automatically identifies the language of the selected text (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, and more) and speaks it with the corresponding dedicated native voice.
-- **Dedicated Native Monolingual Voices**: Enforces neural TTS invariants: uses dedicated native monolingual voices (`it-IT-ElsaNeural`, `fr-FR-DeniseNeural`, `es-ES-ElviraNeural`, `de-DE-KatjaNeural`, `ru-RU-SvetlanaNeural`) to prevent English phonetic leakage on shared vocabulary and cognates.
-- **Dynamic SSML Locale Integrity**: Root `<speak xml:lang='...'>` dynamically matches the detected voice locale.
-- **Dual DOM & Qt Capture**: Directly intercepts keypresses in the card webview DOM for 100% instant, reliable response on Linux.
-- **Instant Disk Caching (<1 ms)**: Caches synthesized audio locally. Repeat reviews play instantly without network access.
-- **Audio Preemption**: Rapidly highlighting words cleanly stops previous playback so the new pronunciation plays immediately.
-- **Zero-Restart Live Config**: Any changes made in **Tools** → **Add-ons** → **Config** take effect immediately on-the-fly without needing to restart Anki.
-- **Multi-Layout Keyboard Support**: Fully layout-resilient (physical key code + Cyrillic mapping). Works seamlessly whether your active keyboard layout is English or Russian.
-- **100% Standalone**: Self-contained with all Python dependencies bundled. Zero setup or API keys needed.
-- **Right-Click Menu**: Also adds a *"Pronounce Selected Text"* action to the reviewer right-click context menu.
+- **Dual-Mode Pronunciation**:
+  - **Selection Mode**: Highlight any word, clause, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser and press **Alt+C** to hear it spoken instantly.
+  - **Fallback Field Mode (New!)**: Press **Alt+C** without selecting any text, and the add-on automatically pronounces a designated note field (default: `"ItalianExample"`).
+  - **Smart Conjugation Matching**: On verb conjugation cards, the add-on dynamically extracts the card's active grammatical person (e.g. *Io*, *Tu*, *Loro*) and pronounces the matching example field (e.g. `"Loro example"`).
+- **On-The-Fly Language Auto-Detection**: Pure-Python zero-dependency detector automatically identifies the language (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, etc.) and routes to the dedicated native monolingual voice.
+- **Dedicated Native Monolingual Voices**: Enforces neural TTS principles: defaults to dedicated native voices (`it-IT-ElsaNeural`, `fr-FR-DeniseNeural`, `es-ES-ElviraNeural`, `de-DE-KatjaNeural`, `ru-RU-SvetlanaNeural`, `en-US-JennyNeural`) to prevent English phonetic leakage on shared vocabulary.
+- **Dynamic SSML Locale Integrity**: Root `<speak xml:lang='...'>` dynamically matches the detected voice locale for authentic native intonation.
+- **Multi-Layout Keyboard Support (English & Russian)**: Built-in physical key code and Cyrillic mapping. `Alt+C` works seamlessly whether your active keyboard layout is English or Russian.
+- **Zero-Restart Live Configuration**: Adjust shortcut, volume, or fallback fields in **Tools** → **Add-ons** → **Config** and changes apply immediately on-the-fly without restarting Anki.
+- **Instant Disk Caching (<1 ms)**: Caches synthesized audio locally. Repeat reviews play instantly without network requests.
+- **Audio Preemption**: Rapid keypresses cleanly terminate previous playback so new audio begins immediately.
+- **100% Standalone**: Self-contained with bundled dependencies. Zero setup or API keys required.
+- **Right-Click Context Menu**: Also adds a *"Pronounce Selected Text (Alt+C)"* action to the reviewer context menu.
 
 ---
 
 ## Default Shortcut & Configuration
 
-Default shortcut is **Shift+Alt+C**.
+Default shortcut is **Alt+C**.
 
-To change the shortcut or adjust configuration, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**:
+To customize the shortcut or adjust settings, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**:
 
 ```json
 {
-  "shortcut": "Shift+Alt+C",
+  "shortcut": "Alt+C",
   "volume": 140,
   "audio_output": "pipewire,pulse",
   "speed": 1.0,

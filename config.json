@@ -1,5 +1,5 @@
 {
-  "shortcut": "Shift+Alt+C",
+  "shortcut": "Alt+C",
   "volume": 140,
   "audio_output": "pipewire,pulse",
   "speed": 1.0,

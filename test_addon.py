@@ -53,7 +53,7 @@ class TestPronounceSelected(unittest.TestCase):
         self.assertIn("KeyC", mock_content.head)
 
     def test_cyrillic_shortcut_condition(self):
-        cond = ps._shortcut_to_js_condition("Shift+Alt+C")
+        cond = ps._shortcut_to_js_condition("Alt+C")
         self.assertIn("\u0441", cond)  # Cyrillic 'с'
         self.assertIn("KeyC", cond)
 

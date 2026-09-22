@@ -1,7 +1,7 @@
 # Pronounce Selected Text Configuration
 
-### `shortcut` (default: `"Shift+Alt+C"`)
-Keyboard shortcut that triggers pronunciation. Can be changed to any combination such as `"Shift+Alt+C"`, `"Alt+C"`, `"Ctrl+Alt+P"`, or `"F4"`.
+### `shortcut` (default: `"Alt+C"`)
+Keyboard shortcut that triggers pronunciation. Can be changed to any combination such as `"Alt+C"`, `"Shift+Alt+C"`, `"Ctrl+Alt+P"`, or `"F4"`.
 
 ### `volume` (default: `140`)
 Software audio volume percentage passed to `mpv` (100 = 100%, 140 = 140% volume boost).

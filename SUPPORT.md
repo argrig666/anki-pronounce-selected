@@ -6,14 +6,14 @@ Welcome! If you are encountering issues, have questions, or want to suggest new 
 
 ## 1. Quick Troubleshooting Checklist
 
-### A. Nothing happens when I press Shift+Alt+C
+### A. Nothing happens when I press Alt+C
 1. **Selection & Fallback:**
    - If text is highlighted, the add-on pronounces the selected text.
    - If no text is highlighted, the add-on pronounces the configured `fallback_field` (defaults to `"ItalianExample"`, or template-specific example on verb cards). If `fallback_field` is set to `""` or the field is empty on the card, it remains silent.
 2. **Keybinding Conflict:**
-   Your desktop environment (Hyprland, GNOME, KDE) or window manager might reserve `Shift+Alt+C`.
+   Your desktop environment (Hyprland, GNOME, KDE) or window manager might reserve `Alt+C`.
    - In Anki, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**.
-   - Change `"shortcut": "Shift+Alt+C"` to another combination, such as `"Ctrl+Shift+P"` or `"F4"`.
+   - Change `"shortcut": "Alt+C"` to another combination, such as `"Shift+Alt+C"`, `"Ctrl+Shift+P"`, or `"F4"`.
    - Restart Anki.
 3. **Check the Debug Log:**
    Open your Anki add-on directory:

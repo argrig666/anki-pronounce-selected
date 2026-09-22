@@ -80,7 +80,7 @@ def _load_config() -> dict[str, Any]:
         except Exception:
             pass
     return {
-        "shortcut": "Shift+Alt+C",
+        "shortcut": "Alt+C",
         "volume": 140,
         "audio_output": "pipewire,pulse",
         "speed": 1.0,
@@ -129,7 +129,7 @@ _CYRILLIC_KEY_MAP: dict[str, str] = {
 
 
 def _shortcut_to_js_condition(shortcut: str) -> str:
-    """Translate Qt shortcut string (e.g. 'Shift+Alt+C') into a JavaScript keydown event condition."""
+    """Translate Qt shortcut string (e.g. 'Alt+C') into a JavaScript keydown event condition."""
     parts = [p.strip().lower() for p in shortcut.split("+")]
     mods = []
     if "ctrl" in parts or "control" in parts:
@@ -595,7 +595,7 @@ def _ensure_reviewer_js_listener(card: Any = None) -> None:
     """Ensure the DOM keydown listener is refreshed on every card question/answer."""
     if aqt.mw and hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "web") and aqt.mw.reviewer.web:
         cfg = _load_config()
-        shortcut = cfg.get("shortcut", "Shift+Alt+C")
+        shortcut = cfg.get("shortcut", "Alt+C")
         script = _build_js_listener(shortcut)
         js_code = script.replace("<script>", "").replace("</script>", "").strip()
         try:
@@ -607,7 +607,7 @@ def _ensure_reviewer_js_listener(card: Any = None) -> None:
 def _on_webview_will_set_content(web_content: aqt.webview.WebContent, context: Any) -> None:
     """Inject DOM keydown listener into every Anki web view."""
     cfg = _load_config()
-    shortcut = cfg.get("shortcut", "Shift+Alt+C")
+    shortcut = cfg.get("shortcut", "Alt+C")
     script = _build_js_listener(shortcut)
     web_content.head += script
     _log(f"Injected JS keydown listener for '{shortcut}' (context={type(context).__name__})")
@@ -644,7 +644,7 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
     """Register reviewer shortcut."""
     if state == "review":
         cfg = _load_config()
-        shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
+        shortcut_key = cfg.get("shortcut", "Alt+C")
         shortcuts.append((shortcut_key, trigger_pronounce))
         parts = shortcut_key.split("+")
         base_k = parts[-1].strip().lower()
@@ -658,7 +658,7 @@ def _on_state_shortcuts_will_change(state: str, shortcuts: list[tuple[str, Any]]
 def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
     """Register editor shortcut."""
     cfg = _load_config()
-    shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
+    shortcut_key = cfg.get("shortcut", "Alt+C")
     shortcuts.append((shortcut_key, lambda ed=editor: on_editor_pronounce(ed), True))
     parts = shortcut_key.split("+")
     base_k = parts[-1].strip().lower()
@@ -672,7 +672,7 @@ def _on_editor_did_init_shortcuts(shortcuts: list[tuple], editor: Any) -> None:
 def _on_reviewer_context_menu(reviewer: Any, menu: QMenu) -> None:
     """Add 'Pronounce Selected Text' to reviewer right-click context menu."""
     cfg = _load_config()
-    shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
+    shortcut_key = cfg.get("shortcut", "Alt+C")
     action = QAction(f"Pronounce Selected Text ({shortcut_key})", menu)
     action.triggered.connect(trigger_pronounce)
     menu.addAction(action)
@@ -696,7 +696,7 @@ def _init_global_shortcuts() -> None:
     _GLOBAL_SHORTCUTS.clear()
 
     cfg = _load_config()
-    shortcut_key = cfg.get("shortcut", "Shift+Alt+C")
+    shortcut_key = cfg.get("shortcut", "Alt+C")
     keys_to_bind = [shortcut_key]
 
     parts = shortcut_key.split("+")
