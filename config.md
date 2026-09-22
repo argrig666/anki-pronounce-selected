@@ -15,5 +15,11 @@ Audio output driver for `mpv` (supports PipeWire and PulseAudio).
 ### `show_tooltip` (default: `false`)
 Set to `true` if you want a subtle status tooltip showing the text and detected language voice. Default is `false` for completely distraction-free audio.
 
+### `fallback_field` (default: `"ItalianExample"`)
+The note field to pronounce when no text is highlighted or selected. If no text is selected when the shortcut is pressed, the add-on automatically reads this field from the active card.
+- Set to any field name (e.g. `"ItalianExample"`, `"FrenchExample"`, `"Example"`, `"Front"`).
+- Features smart template detection: on verb conjugation cards (e.g. *Io*, *Tu*, *Loro*), it automatically selects the template-matching example field (e.g. `"Loro example"`).
+- Set to `""` (empty) if you prefer completely silent behavior when nothing is selected.
+
 ### `debug_log` (default: `true`)
 Appends diagnostic logs to `user_files/debug.log`.

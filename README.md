@@ -10,7 +10,8 @@ Instant, ultra-realistic text-to-speech pronunciation of highlighted text in Ank
 
 ## Features
 
-- **Pure & Silent Design**: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser. If nothing is selected, **NOTHING happens** (no sound, no popup spam, no disruption).
+- **Selection Pronunciation**: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser and pronounces it instantly.
+- **Smart Fallback on Non-Selection**: If no text is selected when pressing the shortcut, the add-on automatically pronounces a configurable card field (default: `"ItalianExample"`). On verb conjugation cards, it intelligently speaks the template-specific example (e.g. `"Loro example"`). Set to `""` in config if you prefer completely silent behavior when nothing is selected.
 - **On-The-Fly Language Auto-Detection**: Automatically identifies the language of the selected text (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, and more) and speaks it with the corresponding dedicated native voice.
 - **Dedicated Native Monolingual Voices**: Enforces neural TTS invariants: uses dedicated native monolingual voices (`it-IT-ElsaNeural`, `fr-FR-DeniseNeural`, `es-ES-ElviraNeural`, `de-DE-KatjaNeural`, `ru-RU-SvetlanaNeural`) to prevent English phonetic leakage on shared vocabulary and cognates.
 - **Dynamic SSML Locale Integrity**: Root `<speak xml:lang='...'>` dynamically matches the detected voice locale.
@@ -26,7 +27,7 @@ Instant, ultra-realistic text-to-speech pronunciation of highlighted text in Ank
 
 Default shortcut is **Shift+Alt+C**.
 
-To change the shortcut or adjust volume, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**:
+To change the shortcut or adjust configuration, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**:
 
 ```json
 {
@@ -35,6 +36,7 @@ To change the shortcut or adjust volume, go to **Tools** → **Add-ons** → **P
   "audio_output": "pipewire,pulse",
   "speed": 1.0,
   "show_tooltip": false,
+  "fallback_field": "ItalianExample",
   "debug_log": true
 }
 ```

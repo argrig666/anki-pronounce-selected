@@ -4,7 +4,8 @@
 
 <h3>Features</h3>
 <ul>
-  <li><b>Pure &amp; Silent Non-Selection</b>: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser. If nothing is selected, <b>NOTHING happens</b> (no sound, no popup spam, no interruption of your review flow).</li>
+  <li><b>Instant Selection Pronunciation</b>: Highlights any word, phrase, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser and pronounces it instantly.</li>
+  <li><b>Smart Fallback on Non-Selection</b>: When no text is selected, the add-on automatically pronounces a configurable card field (default: <code>ItalianExample</code>). On verb conjugation cards, it intelligently speaks the template-specific example (e.g. <code>Loro example</code>). Set to <code>""</code> in config if you prefer completely silent behavior on non-selection.</li>
   <li><b>Automatic Language Detection</b>: Automatically identifies the language of the selected text on-the-fly and selects the corresponding dedicated native voice (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, and more).</li>
   <li><b>Dedicated Native Monolingual Voices</b>: Enforces neural TTS principles by defaulting to native monolingual voices (<code>it-IT-ElsaNeural</code>, <code>fr-FR-DeniseNeural</code>, <code>es-ES-ElviraNeural</code>, <code>de-DE-KatjaNeural</code>, <code>ru-RU-SvetlanaNeural</code>, <code>en-US-JennyNeural</code>) to prevent English phonetic leakage on shared vocabulary.</li>
   <li><b>Dynamic SSML Locale Integrity</b>: Synthesizes audio with exact <code>xml:lang</code> root document matching to ensure pristine native intonation.</li>
@@ -45,6 +46,7 @@
   "audio_output": "pipewire,pulse",
   "speed": 1.0,
   "show_tooltip": false,
+  "fallback_field": "ItalianExample",
   "debug_log": true
 }</code></pre>
 

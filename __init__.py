@@ -4,7 +4,7 @@
 Instantly pronounces highlighted / selected text across Anki (Card Reviewer,
 Note Editor, and Card Browser) using high-quality Microsoft Azure / Edge Neural voices.
 - 100% Standalone add-on with self-contained dependencies and local cache.
-- Pure and silent: NOTHING happens when no text is selected.
+- Smart fallback: pronounces configurable card field (default: ItalianExample) when no text is selected.
 - Automatic language detection: detects language of the selected text on-the-fly!
 - Dedicated native monolingual voices (it-IT-ElsaNeural, fr-FR-DeniseNeural, etc.).
 - Dynamic SSML xml:lang locale integrity.
@@ -85,6 +85,7 @@ def _load_config() -> dict[str, Any]:
         "audio_output": "pipewire,pulse",
         "speed": 1.0,
         "show_tooltip": False,
+        "fallback_field": "ItalianExample",
         "debug_log": True,
     }
 
@@ -357,6 +358,93 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
         threading.Thread(target=run_thread, daemon=True).start()
 
 
+def _resolve_fallback_text(card: Any = None, note: Any = None) -> tuple[str, str | None]:
+    """Resolve text and language context for fallback field when no text is selected."""
+    cfg = _load_config()
+    fallback_field = cfg.get("fallback_field", "ItalianExample")
+    if not fallback_field:
+        return ("", None)
+
+    if card and not note:
+        try:
+            note = card.note()
+        except Exception:
+            note = None
+
+    if not note:
+        return ("", None)
+
+    context_lang = _get_active_card_context_lang() if card else None
+
+    # 1. Exact match in note
+    try:
+        if fallback_field in note and note[fallback_field].strip():
+            return (_clean_text(note[fallback_field]), context_lang)
+    except Exception:
+        pass
+
+    # 2. Case-insensitive match for configured fallback_field
+    target_lower = fallback_field.lower()
+    try:
+        for f_name in note.keys():
+            if f_name.lower() == target_lower and note[f_name].strip():
+                return (_clean_text(note[f_name]), context_lang)
+    except Exception:
+        pass
+
+    # 3. If card template has a person/prefix (e.g. "Loro (Condizionale)"), check "{prefix} example"
+    if card:
+        try:
+            tmpl = card.template()
+            tmpl_name = tmpl.get("name", "") if isinstance(tmpl, dict) else getattr(tmpl, "name", "")
+            prefix = tmpl_name.split("(")[0].strip()
+            if prefix:
+                for cand in (f"{prefix} example", f"{prefix} Example", f"{prefix}Example"):
+                    if cand in note and note[cand].strip():
+                        return (_clean_text(note[cand]), context_lang)
+        except Exception:
+            pass
+
+    # 4. Smart search for language or generic example fields in note (ignoring translation fields)
+    try:
+        for f_name in note.keys():
+            fl = f_name.lower()
+            if any(w in fl for w in ("example", "esempio", "exemple", "пример")):
+                if not any(ign in fl for ign in ("translation", "traduzione", "traduction", "перевод", "english")):
+                    if note[f_name].strip():
+                        return (_clean_text(note[f_name]), context_lang)
+    except Exception:
+        pass
+
+    return ("", None)
+
+
+def trigger_fallback(card: Any = None, note: Any = None, editor: Any = None) -> None:
+    """Handle fallback pronunciation when no text is selected."""
+    _log("trigger_fallback invoked")
+    cfg = _load_config()
+    fallback_field = cfg.get("fallback_field", "ItalianExample")
+    if not fallback_field:
+        _log("trigger_fallback: fallback_field is empty or disabled in config (silent return)")
+        return
+
+    # Determine target card / note
+    if not card and aqt.mw and aqt.mw.state == "review":
+        if hasattr(aqt.mw, "reviewer") and hasattr(aqt.mw.reviewer, "card"):
+            card = aqt.mw.reviewer.card
+
+    if not note and editor:
+        note = getattr(editor, "note", None)
+
+    txt, context_lang = _resolve_fallback_text(card=card, note=note)
+    if not txt:
+        _log("trigger_fallback: No valid fallback text found on card/note (silent return)")
+        return
+
+    _log(f"trigger_fallback pronouncing: '{txt}' (context_lang={context_lang})")
+    pronounce_text(txt, context_lang=context_lang)
+
+
 def trigger_pronounce() -> None:
     """Qt shortcut handler. Queries active webview and clipboard."""
     _log("trigger_pronounce activated via Qt shortcut")
@@ -385,22 +473,24 @@ def trigger_pronounce() -> None:
 
         def on_eval_done(res):
             txt = _clean_text(str(res or ""))
-            if not txt and cb_text:
+            if not txt and not (aqt.mw and aqt.mw.state == "review") and cb_text:
                 txt = cb_text
             if not txt:
-                _log("Qt shortcut: No selection found (silent return)")
+                _log("Qt shortcut: No selection found -> calling trigger_fallback()")
+                trigger_fallback()
                 return
             _log(f"Qt shortcut captured: '{txt}'")
             context_lang = _get_active_card_context_lang()
             pronounce_text(txt, context_lang=context_lang)
 
         web.page().runJavaScript(js, on_eval_done)
-    elif cb_text:
+    elif cb_text and not (aqt.mw and aqt.mw.state == "review"):
         _log(f"Qt shortcut captured from primary clipboard: '{cb_text}'")
         context_lang = _get_active_card_context_lang()
         pronounce_text(cb_text, context_lang=context_lang)
     else:
-        _log("Qt shortcut: No webview or clipboard selection found (silent return)")
+        _log("Qt shortcut: No webview or clipboard selection found -> calling trigger_fallback()")
+        trigger_fallback()
 
 
 def on_editor_pronounce(editor: Any) -> None:
@@ -419,12 +509,15 @@ def on_editor_pronounce(editor: Any) -> None:
                     except Exception:
                         pass
             if not txt:
-                _log("Editor shortcut: No selection found (silent return)")
+                _log("Editor shortcut: No selection found -> calling trigger_fallback(editor=editor)")
+                trigger_fallback(editor=editor)
                 return
             _log(f"Editor shortcut captured: '{txt}'")
             context_lang = _get_editor_context_lang(editor)
             pronounce_text(txt, context_lang=context_lang)
         web.page().runJavaScript(js, on_eval)
+    else:
+        trigger_fallback(editor=editor)
 
 
 # --- DOM Keydown Injection & JS Bridge (100% Reliable In-Card Capture) ---
@@ -455,6 +548,10 @@ def _build_js_listener(shortcut: str) -> str:
                 pycmd("pronounce_selected:" + encodeURIComponent(sel.trim()));
                 e.preventDefault();
                 e.stopPropagation();
+            }} else {{
+                pycmd("pronounce_fallback:");
+                e.preventDefault();
+                e.stopPropagation();
             }}
         }}
     }}, true);
@@ -475,7 +572,7 @@ def _on_webview_will_set_content(web_content: aqt.webview.WebContent, context: A
 def _on_webview_did_receive_js_message(
     handled: tuple[bool, Any], message: str, context: Any
 ) -> tuple[bool, Any]:
-    """Intercept pycmd('pronounce_selected:...') messages from injected DOM listener."""
+    """Intercept pycmd messages from injected DOM listener."""
     if message.startswith("pronounce_selected:"):
         encoded_sel = message[len("pronounce_selected:"):].strip()
         text = urllib.parse.unquote(encoded_sel)
@@ -483,6 +580,16 @@ def _on_webview_did_receive_js_message(
         if text:
             context_lang = _get_active_card_context_lang()
             pronounce_text(text, context_lang=context_lang)
+        return (True, None)
+    if message == "pronounce_fallback:" or message.startswith("pronounce_fallback:"):
+        _log(f"Received JS bridge pronounce_fallback (context={type(context).__name__})")
+        card = getattr(context, "card", None)
+        if card:
+            trigger_fallback(card=card)
+        elif hasattr(context, "note"):
+            trigger_fallback(note=getattr(context, "note", None), editor=context)
+        else:
+            trigger_fallback()
         return (True, None)
     return handled
 

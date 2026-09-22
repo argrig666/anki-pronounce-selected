@@ -4,5 +4,6 @@
   "audio_output": "pipewire,pulse",
   "speed": 1.0,
   "show_tooltip": false,
+  "fallback_field": "ItalianExample",
   "debug_log": true
 }
