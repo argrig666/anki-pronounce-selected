@@ -15,6 +15,7 @@ INCLUDED_ITEMS = [
     "config.md",
     "manifest.json",
     "README.md",
+    "SUPPORT.md",
     "LICENSE",
     "vendor",
 ]

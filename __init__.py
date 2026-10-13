@@ -167,10 +167,11 @@ def _shortcut_to_js_condition(shortcut: str) -> str:
     return " && ".join(mods)
 
 
-def _get_cache_path(voice_name: str, speed: float, text: str) -> str:
+def _get_cache_path(voice_name: str, speed: float, text: str, engine: str = "edge") -> str:
     os.makedirs(_CACHE_DIR, exist_ok=True)
     speed_key = round(speed, 2)
-    key = checksum(f"{voice_name}-{speed_key}-{text}")
+    # Include engine so a gTTS fallback never overwrites a neural Edge cache slot.
+    key = checksum(f"{engine}-{voice_name}-{speed_key}-{text}")
     return os.path.join(_CACHE_DIR, f"{key}.mp3")
 
 
@@ -327,11 +328,16 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
         display_label = clean if len(clean) <= 35 else clean[:32] + "..."
         tooltip(f"🔊 {display_label} [{voice.split('-')[0]}]", period=1000)
 
-    # 1. Check local cache
-    cached_path = _get_cache_path(voice, speed, clean)
-    if os.path.exists(cached_path) and os.path.getsize(cached_path) > 0:
-        _log(f"Cache hit: {cached_path}")
-        _play_audio_file(cached_path, cfg)
+    # 1. Prefer neural Edge cache; keep gTTS in a separate key space
+    edge_path = _get_cache_path(voice, speed, clean, engine="edge")
+    gtts_path = _get_cache_path(voice, speed, clean, engine="gtts")
+    if os.path.exists(edge_path) and os.path.getsize(edge_path) > 0:
+        _log(f"Cache hit (edge): {edge_path}")
+        _play_audio_file(edge_path, cfg)
+        return
+    if os.path.exists(gtts_path) and os.path.getsize(gtts_path) > 0:
+        _log(f"Cache hit (gtts): {gtts_path}")
+        _play_audio_file(gtts_path, cfg)
         return
 
     # 2. Synthesize asynchronously in background
@@ -340,23 +346,23 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
         rate_str = f"{rate_pct:+d}%"
         t0 = time.time()
         try:
-            _run_async(_synthesize_edge(clean, voice, rate_str, cached_path))
-            if os.path.exists(cached_path) and os.path.getsize(cached_path) > 0:
+            _run_async(_synthesize_edge(clean, voice, rate_str, edge_path))
+            if os.path.exists(edge_path) and os.path.getsize(edge_path) > 0:
                 dt = round((time.time() - t0) * 1000)
                 _log(f"Edge TTS synthesized '{clean}' in {dt}ms")
-                return cached_path
+                return edge_path
         except Exception as err:
             _log(f"Edge TTS synthesis error for '{clean}': {err}")
 
-        # Fallback to gTTS if network error
+        # Fallback to gTTS if network error (separate cache key)
         if gTTS is not None:
             try:
                 lang_code = voice.split("-")[0]
                 tts = gTTS(text=clean, lang=lang_code, slow=speed < 1.0)
-                tts.save(cached_path)
-                if os.path.exists(cached_path) and os.path.getsize(cached_path) > 0:
+                tts.save(gtts_path)
+                if os.path.exists(gtts_path) and os.path.getsize(gtts_path) > 0:
                     _log(f"gTTS fallback synthesized '{clean}'")
-                    return cached_path
+                    return gtts_path
             except Exception as gerr:
                 _log(f"gTTS fallback error: {gerr}")
 

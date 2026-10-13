@@ -274,11 +274,8 @@ def mkssml(tc: TTSConfig, escaped_text: Union[str, bytes]) -> str:
     if isinstance(escaped_text, bytes):
         escaped_text = escaped_text.decode("utf-8")
 
-    parts = tc.voice.split("-")
-    lang_code = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else "en-US"
-
     return (
-        f"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{lang_code}'>"
+        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>"
         f"<voice name='{tc.voice}'>"
         f"<prosody pitch='{tc.pitch}' rate='{tc.rate}' volume='{tc.volume}'>"
         f"{escaped_text}"

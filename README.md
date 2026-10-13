@@ -19,7 +19,8 @@ Instant, ultra-realistic text-to-speech pronunciation in Anki upon pressing **Al
 - **Dynamic SSML Locale Integrity**: Root `<speak xml:lang='...'>` dynamically matches the detected voice locale for authentic native intonation.
 - **Multi-Layout Keyboard Support (English & Russian)**: Built-in physical key code and Cyrillic mapping. `Alt+C` works seamlessly whether your active keyboard layout is English or Russian.
 - **Zero-Restart Live Configuration**: Adjust shortcut, volume, or fallback fields in **Tools** → **Add-ons** → **Config** and changes apply immediately on-the-fly without restarting Anki.
-- **Instant Disk Caching (<1 ms)**: Caches synthesized audio locally. Repeat reviews play instantly without network requests.
+- **Instant Disk Caching (<1 ms)**: Caches synthesized audio locally. Repeat reviews play instantly without network requests. Cache keys include the synthesis engine so a temporary gTTS fallback cannot overwrite a neural Edge entry.
+- **Bundled `edge-tts>=7.3.0`**: Required after Microsoft’s October 2026 Edge Read Aloud handshake change (older 7.2.8 builds received HTTP 403 and fell back to lower-quality gTTS).
 - **Audio Preemption**: Rapid keypresses cleanly terminate previous playback so new audio begins immediately.
 - **100% Standalone**: Self-contained with bundled dependencies. Zero setup or API keys required.
 - **Right-Click Context Menu**: Also adds a *"Pronounce Selected Text (Alt+C)"* action to the reviewer context menu.
@@ -52,6 +53,16 @@ Ensure `mpv` is installed on your Linux distribution:
 - **Arch Linux / Omarchy**: `sudo pacman -S mpv`
 - **Ubuntu / Debian**: `sudo apt install mpv`
 - **Fedora**: `sudo dnf install mpv`
+
+---
+
+## Troubleshooting
+
+If neural voices suddenly sound lower quality, or `user_files/debug.log` shows `403 Invalid response status`, see **[SUPPORT.md](SUPPORT.md)**. Short version:
+
+1. Use add-on **v1.2.2+** (`edge-tts>=7.3.0`).
+2. Clear `user_files/cache/` and restart Anki.
+3. Pronounce the affected text again.
 
 ---
 
