@@ -134,6 +134,61 @@ class TestPronounceSelected(unittest.TestCase):
             ps.trigger_fallback(card=mock_card)
             mock_pronounce.assert_called_once_with("Con règole più chiàre, avrèbbero méno dùbbi.", context_lang=None)
 
+    def test_fallback_field_verb_infinitive_arrow_template(self):
+        """Indicativo-style 'Infinitive > Voi' must pronounce Voi example, not Io example."""
+        mock_note = {
+            "Infinitive": "parere",
+            "InfinitiveTranslation": "to seem",
+            "Io": "paio",
+            "Io example": "Ìo pàio sèmpre felìce.",
+            "Io example translation": "I always seem happy.",
+            "Voi": "parete",
+            "Voi example": "Vói paréte stànchi dòpo il viàggio.",
+            "Voi example translation": "You seem tired after the trip.",
+        }
+        mock_card = MagicMock()
+        mock_card.note.return_value = mock_note
+        # Name-only resolution (no qfmt/afmt): prefix after '>' must win.
+        mock_card.template.return_value = {"name": "Infinitive > Voi"}
+
+        with patch.object(ps, "pronounce_text") as mock_pronounce:
+            ps.trigger_fallback(card=mock_card)
+            mock_pronounce.assert_called_once_with(
+                "Vói paréte stànchi dòpo il viàggio.", context_lang=None
+            )
+
+    def test_fallback_field_verb_template_referenced_example(self):
+        """Prefer the example field referenced by the current card template body."""
+        mock_note = {
+            "Infinitive": "occuparsi",
+            "Io example": "Me ne òccupo io prima che arrìvino gli òspiti.",
+            "Voi example": "Ve ne occupàte vói prima che arrìvino gli òspiti.",
+            "Voi example translation": "You take care of it before the guests arrive.",
+        }
+        mock_card = MagicMock()
+        mock_card.note.return_value = mock_note
+        mock_card.template.return_value = {
+            "name": "Infinitive > Voi",
+            "qfmt": "<b>{{Infinitive}}</b><hr>Voi ...",
+            "afmt": (
+                "Voi {{Voi}}"
+                "{{tts it_IT voices=Apple_Emma_(Premium):Voi}}"
+                "<div class=example>{{Voi example}}<br>{{Voi example translation}}</div>"
+            ),
+        }
+
+        with patch.object(ps, "pronounce_text") as mock_pronounce:
+            ps.trigger_fallback(card=mock_card)
+            mock_pronounce.assert_called_once_with(
+                "Ve ne occupàte vói prima che arrìvino gli òspiti.", context_lang=None
+            )
+
+    def test_person_prefixes_from_template_name(self):
+        self.assertEqual(ps._person_prefixes_from_template_name("Infinitive > Voi")[0], "Voi")
+        self.assertEqual(ps._person_prefixes_from_template_name("Loro (Condizionale)")[0], "Loro")
+        self.assertEqual(ps._person_prefixes_from_template_name("Lei/Lui (Cong. Imperf.)")[0], "Lei/Lui")
+        self.assertEqual(ps._person_prefixes_from_template_name("Infinitive > Lei/Lui")[0], "Lei/Lui")
+
     def test_fallback_field_custom_config(self):
         """User can customize fallback_field in settings."""
         mock_note = {

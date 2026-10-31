@@ -66,6 +66,9 @@ _CURRENT_MPV_PROC: subprocess.Popen | None = None
 _HTML_RE = re.compile(r"<[^>]+>")
 _SOUND_RE = re.compile(r"\[sound:[^\]]*\]")
 _TTS_TAG_RE = re.compile(r"\{\{tts\s+([a-zA-Z_\-]+)")
+_FIELD_REF_RE = re.compile(r"\{\{\{?\s*([^}]+?)\s*\}?\}\}")
+_EXAMPLE_FIELD_HINTS = ("example", "esempio", "exemple", "пример")
+_TRANSLATION_FIELD_HINTS = ("translation", "traduzione", "traduction", "перевод", "english")
 
 
 def _load_config() -> dict[str, Any]:
@@ -389,6 +392,81 @@ def pronounce_text(text: str, context_lang: str | None = None) -> None:
         threading.Thread(target=run_thread, daemon=True).start()
 
 
+def _is_target_example_field(name: str) -> bool:
+    """True for target-language example fields (not translation/gloss fields)."""
+    fl = name.lower()
+    if not any(w in fl for w in _EXAMPLE_FIELD_HINTS):
+        return False
+    return not any(ign in fl for ign in _TRANSLATION_FIELD_HINTS)
+
+
+def _note_field_value(note: Any, field_name: str) -> str:
+    """Return stripped field text from a note, matching field names case-insensitively."""
+    try:
+        if field_name in note and note[field_name].strip():
+            return note[field_name].strip()
+    except Exception:
+        pass
+    target = field_name.lower()
+    try:
+        for f_name in note.keys():
+            if f_name.lower() == target and note[f_name].strip():
+                return note[f_name].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _fields_referenced_in_template(tmpl: Any) -> list[str]:
+    """Extract Anki field names referenced by a card template (qfmt + afmt)."""
+    if isinstance(tmpl, dict):
+        blob = f"{tmpl.get('qfmt', '')}\n{tmpl.get('afmt', '')}"
+    else:
+        blob = f"{getattr(tmpl, 'qfmt', '')}\n{getattr(tmpl, 'afmt', '')}"
+
+    names: list[str] = []
+    seen: set[str] = set()
+    for m in _FIELD_REF_RE.finditer(blob):
+        inner = m.group(1).strip()
+        if not inner or inner.startswith("/") or inner.startswith("^"):
+            continue
+        if inner.startswith("#"):
+            inner = inner[1:].strip()
+        # Modifiers / TTS: field name is after the last colon
+        # (e.g. text:Field, tts it_IT voices=...:Voi example)
+        if ":" in inner:
+            inner = inner.rsplit(":", 1)[-1].strip()
+        if not inner or inner in seen:
+            continue
+        seen.add(inner)
+        names.append(inner)
+    return names
+
+
+def _person_prefixes_from_template_name(tmpl_name: str) -> list[str]:
+    """Extract likely person/label prefixes from a card template name.
+
+    Supports names such as:
+      - "Loro (Condizionale)" -> Loro
+      - "Voi (Cong. Imperf.)" -> Voi
+      - "Infinitive > Voi" -> Voi
+      - "Infinitive > Lei/Lui" -> Lei/Lui
+    """
+    if not tmpl_name:
+        return []
+    prefixes: list[str] = []
+    before_paren = tmpl_name.split("(", 1)[0].strip()
+    after_arrow = before_paren.split(">")[-1].strip() if ">" in before_paren else before_paren
+    for p in (after_arrow, before_paren, tmpl_name.strip()):
+        if p and p not in prefixes:
+            prefixes.append(p)
+    return prefixes
+
+
+def _example_candidates_for_prefix(prefix: str) -> list[str]:
+    return [f"{prefix} example", f"{prefix} Example", f"{prefix}Example"]
+
+
 def _resolve_fallback_text(card: Any = None, note: Any = None) -> tuple[str, str | None]:
     """Resolve text and language context for fallback field when no text is selected."""
     cfg = _load_config()
@@ -407,43 +485,44 @@ def _resolve_fallback_text(card: Any = None, note: Any = None) -> tuple[str, str
 
     context_lang = _get_active_card_context_lang() if card else None
 
-    # 1. Exact match in note
-    try:
-        if fallback_field in note and note[fallback_field].strip():
-            return (_clean_text(note[fallback_field]), context_lang)
-    except Exception:
-        pass
+    # 1. Prefer example fields actually shown on the current card template.
+    #    This is what makes "Infinitive > Voi" pronounce "Voi example" instead of "Io example".
+    if card:
+        try:
+            for fname in _fields_referenced_in_template(card.template()):
+                if _is_target_example_field(fname):
+                    val = _note_field_value(note, fname)
+                    if val:
+                        return (_clean_text(val), context_lang)
+        except Exception:
+            pass
 
-    # 2. Case-insensitive match for configured fallback_field
-    target_lower = fallback_field.lower()
-    try:
-        for f_name in note.keys():
-            if f_name.lower() == target_lower and note[f_name].strip():
-                return (_clean_text(note[f_name]), context_lang)
-    except Exception:
-        pass
-
-    # 3. If card template has a person/prefix (e.g. "Loro (Condizionale)"), check "{prefix} example"
+    # 2. Template-name person/prefix matching
+    #    (e.g. "Loro (Condizionale)" / "Infinitive > Voi" -> "{person} example")
     if card:
         try:
             tmpl = card.template()
             tmpl_name = tmpl.get("name", "") if isinstance(tmpl, dict) else getattr(tmpl, "name", "")
-            prefix = tmpl_name.split("(")[0].strip()
-            if prefix:
-                for cand in (f"{prefix} example", f"{prefix} Example", f"{prefix}Example"):
-                    if cand in note and note[cand].strip():
-                        return (_clean_text(note[cand]), context_lang)
+            for prefix in _person_prefixes_from_template_name(tmpl_name):
+                for cand in _example_candidates_for_prefix(prefix):
+                    val = _note_field_value(note, cand)
+                    if val:
+                        return (_clean_text(val), context_lang)
         except Exception:
             pass
 
-    # 4. Smart search for language or generic example fields in note (ignoring translation fields)
+    # 3. Configured fallback_field (exact, then case-insensitive)
+    val = _note_field_value(note, fallback_field)
+    if val:
+        return (_clean_text(val), context_lang)
+
+    # 4. First generic target-language example field on the note
     try:
         for f_name in note.keys():
-            fl = f_name.lower()
-            if any(w in fl for w in ("example", "esempio", "exemple", "пример")):
-                if not any(ign in fl for ign in ("translation", "traduzione", "traduction", "перевод", "english")):
-                    if note[f_name].strip():
-                        return (_clean_text(note[f_name]), context_lang)
+            if _is_target_example_field(f_name):
+                val = _note_field_value(note, f_name)
+                if val:
+                    return (_clean_text(val), context_lang)
     except Exception:
         pass
 
