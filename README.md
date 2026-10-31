@@ -12,8 +12,8 @@ Instant, ultra-realistic text-to-speech pronunciation in Anki upon pressing **Al
 
 - **Dual-Mode Pronunciation**:
   - **Selection Mode**: Highlight any word, clause, idiom, or full sentence across the Card Reviewer, Note Editor, or Card Browser and press **Alt+C** to hear it spoken instantly.
-  - **Fallback Field Mode (New!)**: Press **Alt+C** without selecting any text, and the add-on automatically pronounces a designated note field (default: `"ItalianExample"`).
-  - **Smart Conjugation Matching**: On verb conjugation cards, the add-on dynamically extracts the card's active grammatical person (e.g. *Io*, *Tu*, *Loro*) and pronounces the matching example field (e.g. `"Loro example"`).
+  - **Fallback Field Mode**: Press **Alt+C** without selecting any text, and the add-on pronounces a field of the **current card** (preferred name configurable, default `"ItalianExample"`).
+  - **Current-card scoping**: On multi-card notes (e.g. verb conjugations with Io/Tu/Voi examples), it reads the example shown on the active card — never a sibling card’s field.
 - **On-The-Fly Language Auto-Detection**: Pure-Python zero-dependency detector automatically identifies the language (Italian, French, Spanish, German, Russian, English, Portuguese, Japanese, Chinese, etc.) and routes to the dedicated native monolingual voice.
 - **Dedicated Native Monolingual Voices**: Enforces neural TTS principles: defaults to dedicated native voices (`it-IT-ElsaNeural`, `fr-FR-DeniseNeural`, `es-ES-ElviraNeural`, `de-DE-KatjaNeural`, `ru-RU-SvetlanaNeural`, `en-US-JennyNeural`) to prevent English phonetic leakage on shared vocabulary.
 - **Dynamic SSML Locale Integrity**: Root `<speak xml:lang='...'>` dynamically matches the detected voice locale for authentic native intonation.

@@ -110,11 +110,56 @@ class TestPronounceSelected(unittest.TestCase):
         }
         mock_card = MagicMock()
         mock_card.note.return_value = mock_note
-        mock_card.template.return_value = {"name": "Card 1"}
+        mock_card.template.return_value = {
+            "name": "Card 1",
+            "qfmt": "<b>{{ItalianWord}}</b><div class=example>{{ItalianExample}}</div>",
+            "afmt": "{{FrontSide}}<div class=example>{{EnglishExample}}</div>{{EnglishWord}}",
+        }
 
         with patch.object(ps, "pronounce_text") as mock_pronounce:
             ps.trigger_fallback(card=mock_card)
             mock_pronounce.assert_called_once_with("Ho bisógno di ùno zàino per la scuòla.", context_lang=None)
+
+    def test_fallback_uses_current_card_field_only(self):
+        """Never pronounce a sibling note field that is not on the current card."""
+        mock_note = {
+            "Io example": "Ìo pàio sèmpre felìce.",
+            "Voi example": "Vói paréte stànchi dòpo il viàggio.",
+            "ItalianExample": "This belongs to a different card type.",
+        }
+        mock_card = MagicMock()
+        mock_card.note.return_value = mock_note
+        mock_card.template.return_value = {
+            "name": "Infinitive > Voi",
+            "qfmt": "Voi ...",
+            "afmt": "Voi {{Voi}}<div class=example>{{Voi example}}</div>",
+        }
+
+        with patch.object(ps, "pronounce_text") as mock_pronounce:
+            ps.trigger_fallback(card=mock_card)
+            mock_pronounce.assert_called_once_with(
+                "Vói paréte stànchi dòpo il viàggio.", context_lang=None
+            )
+
+    def test_fallback_prefers_card_example_over_configured_other_language(self):
+        """On a French card, read FrenchExample even if config still says ItalianExample."""
+        mock_note = {
+            "FrenchWord": "bonjour",
+            "FrenchExample": "Bonjour tout le monde!",
+            "EnglishExample": "Hello everyone!",
+        }
+        mock_card = MagicMock()
+        mock_card.note.return_value = mock_note
+        mock_card.template.return_value = {
+            "name": "Card 2",
+            "qfmt": "{{EnglishWord}}<div class=example>{{EnglishExample}}</div>",
+            "afmt": "{{FrontSide}}<div class=example>{{FrenchExample}}</div>",
+        }
+
+        with patch.object(ps, "_load_config", return_value={"fallback_field": "ItalianExample"}):
+            with patch.object(ps, "pronounce_text") as mock_pronounce:
+                ps.trigger_fallback(card=mock_card)
+                mock_pronounce.assert_called_once_with("Bonjour tout le monde!", context_lang=None)
 
     def test_fallback_field_verb_conjugation_card(self):
         """Smart fallback: matches person example (e.g. Loro example) on verb cards."""
@@ -197,7 +242,11 @@ class TestPronounceSelected(unittest.TestCase):
         }
         mock_card = MagicMock()
         mock_card.note.return_value = mock_note
-        mock_card.template.return_value = {"name": "Card 1"}
+        mock_card.template.return_value = {
+            "name": "Card 1",
+            "qfmt": "<b>{{FrenchWord}}</b><div class=example>{{FrenchExample}}</div>",
+            "afmt": "{{FrontSide}}",
+        }
 
         with patch.object(ps, "_load_config", return_value={"fallback_field": "FrenchExample"}):
             with patch.object(ps, "pronounce_text") as mock_pronounce:

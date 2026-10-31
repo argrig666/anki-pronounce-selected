@@ -4,7 +4,8 @@
 Instantly pronounces highlighted / selected text across Anki (Card Reviewer,
 Note Editor, and Card Browser) using high-quality Microsoft Azure / Edge Neural voices.
 - 100% Standalone add-on with self-contained dependencies and local cache.
-- Smart fallback: pronounces configurable card field (default: ItalianExample) when no text is selected.
+- Smart fallback: when no text is selected, pronounces a field of the current card
+  (preferred name configurable, default: ItalianExample).
 - Automatic language detection: detects language of the selected text on-the-fly!
 - Dedicated native monolingual voices (it-IT-ElsaNeural, fr-FR-DeniseNeural, etc.).
 - Dynamic SSML xml:lang locale integrity.
@@ -467,8 +468,72 @@ def _example_candidates_for_prefix(prefix: str) -> list[str]:
     return [f"{prefix} example", f"{prefix} Example", f"{prefix}Example"]
 
 
+def _card_template_field_names(card: Any) -> list[str]:
+    """Field names referenced by the active card template (question + answer)."""
+    try:
+        return _fields_referenced_in_template(card.template())
+    except Exception:
+        return []
+
+
+def _first_filled_field(note: Any, field_names: list[str]) -> str:
+    for fname in field_names:
+        val = _note_field_value(note, fname)
+        if val:
+            return val
+    return ""
+
+
+def _resolve_from_card_fields(
+    note: Any, card_fields: list[str], fallback_field: str
+) -> str:
+    """Pick text from fields that belong to the current card.
+
+    Preference order:
+      1. Configured fallback_field, if this card uses it
+      2. Target-language example fields shown on this card
+      3. Configured fallback_field name itself (case-insensitive), as a last
+         card-scoped attempt when the template list used a different casing
+    """
+    card_fields_lower = {f.lower(): f for f in card_fields}
+
+    # 1. Exact configured field on this card
+    configured = card_fields_lower.get(fallback_field.lower())
+    if configured:
+        val = _note_field_value(note, configured)
+        if val:
+            return val
+
+    # 2. Target-language example fields that this card actually displays
+    example_fields = [f for f in card_fields if _is_target_example_field(f)]
+    val = _first_filled_field(note, example_fields)
+    if val:
+        return val
+
+    return ""
+
+
+def _resolve_from_template_name(note: Any, card: Any) -> str:
+    """When template bodies are unavailable, map template name -> person example."""
+    try:
+        tmpl = card.template()
+        tmpl_name = tmpl.get("name", "") if isinstance(tmpl, dict) else getattr(tmpl, "name", "")
+    except Exception:
+        return ""
+    for prefix in _person_prefixes_from_template_name(tmpl_name):
+        val = _first_filled_field(note, _example_candidates_for_prefix(prefix))
+        if val:
+            return val
+    return ""
+
+
 def _resolve_fallback_text(card: Any = None, note: Any = None) -> tuple[str, str | None]:
-    """Resolve text and language context for fallback field when no text is selected."""
+    """Resolve text for fallback when no selection exists.
+
+    Rule: pronounce a field of the *current card*, not an arbitrary field from
+    the underlying note. `fallback_field` is a preference among that card's
+    fields (e.g. prefer ItalianExample when the card has several fields).
+    """
     cfg = _load_config()
     fallback_field = cfg.get("fallback_field", "ItalianExample")
     if not fallback_field:
@@ -485,38 +550,34 @@ def _resolve_fallback_text(card: Any = None, note: Any = None) -> tuple[str, str
 
     context_lang = _get_active_card_context_lang() if card else None
 
-    # 1. Prefer example fields actually shown on the current card template.
-    #    This is what makes "Infinitive > Voi" pronounce "Voi example" instead of "Io example".
+    # Reviewer path: stay scoped to the active card's template fields.
     if card:
-        try:
-            for fname in _fields_referenced_in_template(card.template()):
-                if _is_target_example_field(fname):
-                    val = _note_field_value(note, fname)
-                    if val:
-                        return (_clean_text(val), context_lang)
-        except Exception:
-            pass
+        card_fields = _card_template_field_names(card)
+        if card_fields:
+            val = _resolve_from_card_fields(note, card_fields, fallback_field)
+            if val:
+                return (_clean_text(val), context_lang)
+            # This card's fields are known and none matched. Do not read a
+            # sibling note field that belongs to a different card.
+            return ("", None)
 
-    # 2. Template-name person/prefix matching
-    #    (e.g. "Loro (Condizionale)" / "Infinitive > Voi" -> "{person} example")
-    if card:
-        try:
-            tmpl = card.template()
-            tmpl_name = tmpl.get("name", "") if isinstance(tmpl, dict) else getattr(tmpl, "name", "")
-            for prefix in _person_prefixes_from_template_name(tmpl_name):
-                for cand in _example_candidates_for_prefix(prefix):
-                    val = _note_field_value(note, cand)
-                    if val:
-                        return (_clean_text(val), context_lang)
-        except Exception:
-            pass
+        # Name-only / unparseable templates (e.g. "Infinitive > Voi"):
+        # resolve the person example for *this* card, never another person.
+        val = _resolve_from_template_name(note, card)
+        if val:
+            return (_clean_text(val), context_lang)
 
-    # 3. Configured fallback_field (exact, then case-insensitive)
+        # Template body unavailable: fall back to the configured note field.
+        val = _note_field_value(note, fallback_field)
+        if val:
+            return (_clean_text(val), context_lang)
+        return ("", None)
+
+    # Editor / no card: use the configured note field, then any target example.
     val = _note_field_value(note, fallback_field)
     if val:
         return (_clean_text(val), context_lang)
 
-    # 4. First generic target-language example field on the note
     try:
         for f_name in note.keys():
             if _is_target_example_field(f_name):

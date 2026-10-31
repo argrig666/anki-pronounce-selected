@@ -9,7 +9,7 @@ Welcome! If you are encountering issues, have questions, or want to suggest new 
 ### A. Nothing happens when I press Alt+C
 1. **Selection & Fallback:**
    - If text is highlighted, the add-on pronounces the selected text.
-   - If no text is highlighted, the add-on pronounces the configured `fallback_field` (defaults to `"ItalianExample"`, or template-specific example on verb cards). If `fallback_field` is set to `""` or the field is empty on the card, it remains silent.
+   - If no text is highlighted, the add-on pronounces a field of the **current card** (prefers configured `fallback_field`, otherwise that card’s target-language example). It will not read a sibling card’s field from the same note. If `fallback_field` is set to `""` or no suitable field exists on the card, it remains silent.
 2. **Keybinding Conflict:**
    Your desktop environment (Hyprland, GNOME, KDE) or window manager might reserve `Alt+C`.
    - In Anki, go to **Tools** → **Add-ons** → **Pronounce Selected Text** → **Config**.
